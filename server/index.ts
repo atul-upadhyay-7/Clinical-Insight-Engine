@@ -85,7 +85,7 @@ app.use(
           "'self'",
           "'unsafe-eval'",
           "'unsafe-inline'",
-          (_req: any, res: any) => `'nonce-${res.locals.cspNonce}'`,
+          (_req: any, res: any) => `'nonce-${res.locals.cspNonce}',`
         ],
         styleSrc: [
           "'self'",
@@ -102,6 +102,14 @@ app.use(
     crossOriginEmbedderPolicy: false,
   }),
 );
+
+function summarizeApiResponse(body: Record<string, any>) {
+  if (!body || typeof body !== "object") {
+    return "[non-object response]";
+  }
+
+  return `[response keys: ${Object.keys(body).join(", ") || "none"}]`;
+}
 
 export function log(message: string, source = "express") {
   const formattedTime = new Date().toLocaleTimeString("en-US", {
@@ -130,7 +138,7 @@ app.use((req, res, next) => {
     if (path.startsWith("/api")) {
       let logLine = `${req.method} ${path} ${res.statusCode} in ${duration}ms`;
       if (capturedJsonResponse) {
-        logLine += ` :: ${JSON.stringify(capturedJsonResponse)}`;
+        logLine += ` :: ${summarizeApiResponse(capturedJsonResponse)}`;
       }
 
       log(logLine);
