@@ -195,7 +195,7 @@ export function createAuthRouter(): Router {
     } else {
       // Check in-memory store (legacy)
       const registeredUser = registeredUsers.get(email);
-      if (registeredUser && verifyPassword(password, registeredUser.passwordHash)) {
+      if (registeredUser && bcrypt.compareSync(password, registeredUser.password)) {
         userName = registeredUser.fullName;
       }
 
