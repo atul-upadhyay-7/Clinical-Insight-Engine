@@ -737,7 +737,7 @@ export async function registerRoutes(
     try {
       const userEmail = req.session.user?.email;
       const assessments = await storage.getAssessments(50, 0, userEmail);
-
+      logAccessAttempt(req.session.user!.id, "Assessments", "all", true, "Fetched assessment list");
       res.json(assessments);
 
     } catch (err) {
@@ -758,6 +758,16 @@ export async function registerRoutes(
         const csv = assessmentsToCsv(
           assessments as unknown as Record<string, unknown>[]
         );
+        logAccessAttempt(req.session.user!.id, "Assessments", "all", true, "Exported assessments to CSV");
+        res.header("Content-Type", "text/csv");
+        res.attachment("assessments.csv");
+        return res.send(csv);
+      } catch (err) {
+        console.error("Export error:", err);
+        return res.status(500).json({ message: "Export failed" });
+      }
+    }
+  );
 
   /**
    * GET /api/assessments/search
@@ -843,7 +853,7 @@ export async function registerRoutes(
           limit,
           offset
         );
-
+        logAccessAttempt(req.session.user!.id, "Assessments", "search", true, "Searched assessments");
         return res.json(results);
 
       } catch (err) {
@@ -987,7 +997,7 @@ export async function registerRoutes(
           limit,
           offset
         );
-
+        logAccessAttempt(req.session.user!.id, "Assessments", "search", true, "Searched assessments");
         return res.json(results);
 
       } catch (err) {
@@ -1122,7 +1132,7 @@ export async function registerRoutes(
           limit,
           offset
         );
-
+        logAccessAttempt(req.session.user!.id, "Assessments", "search", true, "Searched assessments");
         return res.json(results);
 
       } catch (err) {
@@ -1257,7 +1267,7 @@ export async function registerRoutes(
           limit,
           offset
         );
-
+        logAccessAttempt(req.session.user!.id, "Assessments", "search", true, "Searched assessments");
         return res.json(results);
 
       } catch (err) {
@@ -1413,7 +1423,7 @@ export async function registerRoutes(
           limit,
           offset
         );
-
+        logAccessAttempt(req.session.user!.id, "Assessments", "search", true, "Searched assessments");
         return res.json(results);
 
       } catch (err) {
@@ -1569,7 +1579,7 @@ export async function registerRoutes(
           limit,
           offset
         );
-
+        logAccessAttempt(req.session.user!.id, "Assessments", "search", true, "Searched assessments");
         return res.json(results);
 
       } catch (err) {
