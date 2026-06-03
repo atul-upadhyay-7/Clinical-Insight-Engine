@@ -457,7 +457,10 @@ export default function History() {
                 : "There are no patient assessments matching your criteria. Go to the dashboard to create a new assessment."}
             </p>
           </div>
-        ) : (
+       ) : (
+  <>      <AssessmentComparisonCard
+            assessments={assessments || []}
+          />
           <div className="bg-card rounded-2xl shadow-sm border border-border overflow-hidden">
             <div className="overflow-x-auto">
               <table className="w-full text-left border-collapse">
@@ -676,6 +679,7 @@ export default function History() {
               </div>
             </div>
           </div>
+          </>
         )}
       </div>
 
