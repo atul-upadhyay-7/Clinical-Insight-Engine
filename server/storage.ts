@@ -14,7 +14,7 @@ import {
 import type { RiskCategory } from "./validation/searchValidation";
 
 export interface IStorage {
-  getAssessments(limit?: number, cursor?: number, createdBy?: string): Promise<Assessment[]>;
+  getAssessments(limit?: number, cursor?: number, createdBy?: string): Promise<{ data: Assessment[]; nextCursor: number | null }>;
   /**
    * Searches assessments by risk category label using parameterized queries.
    * Uses Drizzle ORM eq() — user input is NEVER interpolated into SQL strings.
@@ -25,7 +25,7 @@ export interface IStorage {
     riskCategory?: RiskCategory,
     limit?: number,
     cursor?: number
-  ): Promise<Assessment[]>;
+  ): Promise<{ data: Assessment[]; nextCursor: number | null }>;
   /** Returns a single assessment by numeric ID. Authorization must be checked by caller. */
   getAssessmentById(id: number): Promise<Assessment | undefined>;
   createAssessment(assessment: any): Promise<Assessment>;
@@ -72,7 +72,7 @@ export class DatabaseStorage implements IStorage {
     const filters: ReturnType<typeof eq>[] = [];
 
     if (createdBy) {
-      conditions.push(eq(assessments.createdBy, createdBy));
+      filters.push(eq(assessments.createdBy, createdBy));
     }
 
     if (cursor !== undefined) {

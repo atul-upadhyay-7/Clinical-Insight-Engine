@@ -5,7 +5,6 @@ import type { Express } from "express";
 import type { Server } from "http";
 import authRouter from "./routes/auth.routes";
 import assessmentsRouter from "./routes/assessments.routes";
-import { seedDatabase } from "./utils/seed";
 import { storage, type AssessmentCreateInput } from "./storage";
 import { requireAuth, requireAdmin, requireVerified } from "./auth";
 import { api } from "@shared/routes";
@@ -20,7 +19,6 @@ import os from "os";
 import path from "path";
 import { fileURLToPath } from "url";
 import { rateLimit } from "express-rate-limit";
-import { assessmentsToCsv } from "./utils/csvSanitizer";
 import {
   sanitizeDatabaseError,
   analyzeSearchInput,
@@ -379,9 +377,7 @@ function calculateClinicalFallback(input: any): PredictionResult {
       ? ["Please schedule an appointment with your clinician to check diagnostic lab ranges."]
       : riskCategory === "MODERATE"
       ? ["Making positive dietary changes and staying active helps lower type 2 diabetes risk."]
-      : ["Continue maintaining a healthy, balanced lifestyle and regular physical activity."],
-    confidenceInterval: `${Math.max(1, riskScore - 5)}% - ${Math.min(99, riskScore + 5)}%`,
-    modelConfidence: 0.95
+      : ["Continue maintaining a healthy, balanced lifestyle and regular physical activity."]
   };
 }
 
@@ -438,7 +434,7 @@ export async function registerRoutes(
 
   app.patch("/api/admin/users/:id", requireAuth, requireAdmin, async (req, res) => {
     try {
-      const { id } = req.params;
+      const id = req.params.id as string;
       const { isActive, role } = req.body;
       const updated = await storage.updateUser(id, { isActive, role });
       res.json(updated);

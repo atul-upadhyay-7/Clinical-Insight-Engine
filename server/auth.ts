@@ -1,5 +1,5 @@
 import { Router, type Request, type Response, type NextFunction } from "express";
-import { randomInt } from "crypto";
+import { randomInt, randomBytes } from "crypto";
 import bcrypt from "bcrypt";
 import { rateLimit } from "express-rate-limit";
 import { eq, and, gte } from "drizzle-orm";
@@ -121,13 +121,7 @@ const verifyEmailLimiter = rateLimit({
   message: { error: "Too many verification attempts. Please try again later." },
 });
 
-const authLimiter = rateLimit({
-  windowMs: 15 * 60 * 1000, // 15 minutes
-  limit: 15,
-  standardHeaders: "draft-8",
-  legacyHeaders: false,
-  message: { error: "Too many login/registration attempts. Please try again in 15 minutes." },
-});
+
 
 const resendLimiter = rateLimit({
   windowMs: 60 * 60 * 1000, // 1 hour

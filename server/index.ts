@@ -19,19 +19,14 @@ import { serveStatic } from "./static";
 import { sanitizeDatabaseError } from "./security/sqlProtection";
 import { createServer } from "http";
 import { loggingAnomalyMiddleware } from "./middleware/loggingAnomaly";
-import { promisify } from "util";
-import { execFile } from "child_process";
 import { logger } from "./logger";
 import { requestIdMiddleware } from "./middleware/requestId";
 
+
 const execFileAsync = promisify(execFile);
-
-
 const app = express();
 const httpServer = createServer(app);
 const REQUEST_BODY_LIMIT = "256kb";
-const execFileAsync = promisify(execFile);
-
 if (process.env.NODE_ENV === "production") {
   app.set("trust proxy", true);
 }
