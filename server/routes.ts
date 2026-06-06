@@ -410,11 +410,11 @@ export async function registerRoutes(
 
   // Mount domain-specific routers
   app.use("/api/auth", authRouter);
-  app.use("/api/assessments", assessmentsRouter);
-
+  app.use("/api/assessments", analyticsRouter);
   app.use("/api/assessments", mlRouter);
   app.use("/api/assessments", exportsRouter);
-  app.use("/api/assessments", analyticsRouter);
+  
+  app.use("/api/assessments", assessmentsRouter);
 
   // ─── Admin Routes ────────────────────────────────────────────────
 
