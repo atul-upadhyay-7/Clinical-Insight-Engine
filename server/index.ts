@@ -1,6 +1,5 @@
 import crypto from "crypto";
-import { execFile } from "child_process";
-import { promisify } from "util";
+import { safeExecML } from "./utils/exec";
 import express, { type Request, Response, NextFunction } from "express";
 import cors from "cors";
 import helmet from "helmet";
@@ -31,7 +30,7 @@ import {
 import { EmailConfigurationError, validateSmtpConfig } from "./email";
 import { generalLimiter } from "./middleware/rateLimit";
 
-const execFileAsync = promisify(execFile);
+
 const app = express();
 const httpServer = createServer(app);
 
@@ -248,7 +247,7 @@ app.use((req, res, next) => {
   app.use("/api/patients", generalLimiter, patientsRouter);
   // Warm up ML model at startup so first prediction request is fast
   logger.info({ source: "ml" }, "Warming up ML model at startup...");
-  execFileAsync(getPythonExecutable(), ["analyze.py", "train"])
+  safeExecML(getPythonExecutable(), ["analyze.py", "train"])
     .then(() => logger.info({ source: "ml" }, "ML model ready."))
     .catch((err: any) => logger.warn({ source: "ml" }, `ML warmup warning: ${err.message}`));
   await registerRoutes(httpServer, app);

@@ -1,5 +1,5 @@
 import { createHash, randomUUID } from "crypto";
-import { execFile } from "child_process";
+import { safeExecFile } from "../utils/exec";
 import { existsSync } from "fs";
 import { writeFile, unlink } from "fs/promises";
 import os from "os";
@@ -242,7 +242,7 @@ export async function runAssessmentInference(input: unknown): Promise<{ predicti
     await writeFile(tempFilePath, JSON.stringify(input));
 
     const stdout = await new Promise<string>((resolve, reject) => {
-      const child = execFile(
+      const child = safeExecFile(
         getPythonExecutable(),
         [analyzePyPath, "predict_file", tempFilePath],
         {

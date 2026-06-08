@@ -226,7 +226,7 @@ import { validateDTO } from "./middleware/validateDTO";
 import { z } from "zod";
 import { MLService, generateRequestFingerprint } from "./services/mlService";
 import { getAssessmentQueue, getPythonExecutable } from "./queue";
-import { execFile } from "child_process";
+import { safeExecFile } from "./utils/exec";
 import path from "path";
 import { fileURLToPath } from "url";
 import os from "os";
@@ -238,7 +238,7 @@ const __dirname = path.dirname(__filename);
 const analyzePyPath = path.resolve(__dirname, "..", "analyze.py");
 function execFileAsync(file: string, args: string[], options: any): Promise<{ stdout: string; stderr: string }> {
   return new Promise((resolve, reject) => {
-    execFile(file, args, options, (err, stdout, stderr) => {
+    safeExecFile(file, args, options, (err, stdout, stderr) => {
       if (err) reject(err);
       else resolve({ stdout: stdout as unknown as string, stderr: stderr as unknown as string });
     });

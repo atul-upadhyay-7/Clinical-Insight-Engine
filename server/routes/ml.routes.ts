@@ -10,12 +10,11 @@ import { api } from "@shared/routes";
 import { storage } from "../storage";
 import { MLService, getPythonExecutable } from "../services/mlService";
 import { validateDTO } from "../middleware/validateDTO";
-import { execFile } from "child_process";
-import { promisify } from "util";
+import { safeExecML } from "../utils/exec";
 import { fileURLToPath } from "url";
 import { mlLimiter } from "../middleware/rateLimit";
 
-const execFileAsync = promisify(execFile);
+
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 const analyzePyPath = path.resolve(__dirname, "..", "..", "analyze.py");
@@ -51,7 +50,7 @@ mlRouter.post(
 
       let predictions: any[];
       try {
-        const { stdout } = await execFileAsync(
+        const { stdout } = await safeExecML(
           getPythonExecutable(),
           [analyzePyPath, "predict_file", tempFilePath],
           { timeout: 60000, maxBuffer: 50 * 1024 * 1024 }
