@@ -11,8 +11,7 @@ import History from "./pages/History";
 import Analytics from "./pages/Analytics";
 import ImportData from "./pages/ImportData";
 import AdminDashboard from "./pages/AdminDashboard";
-import MyHealth from "./pages/MyHealth";
-import PatientLogin from "./pages/PatientLogin";
+import ModelMonitoring from "./pages/ModelMonitoring";
 
 import LoginPage from "./pages/LoginPage";
 import ForgotPassword from "./pages/ForgotPassword";
@@ -50,8 +49,11 @@ function Router() {
           <AdminDashboard />
         </ProtectedRoute>
       </Route>
-      <Route path="/my-health" component={MyHealth} />
-      <Route path="/patient-login" component={PatientLogin} />
+      <Route path="/admin/model-monitoring">
+        <ProtectedRoute requireAdmin>
+          <ModelMonitoring />
+        </ProtectedRoute>
+      </Route>
       <Route path="/login" component={LoginPage} />
       <Route path="/forgot-password" component={ForgotPassword} />
       <Route path="/reset-password" component={ResetPassword} />
