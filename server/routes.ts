@@ -7,6 +7,7 @@ import type { Express } from "express";
 import type { Server } from "http";
 
 import assessmentsRouter from "./routes/assessments.routes";
+import { MLService, generateRequestFingerprint, calculateClinicalFallback, getPythonExecutable } from "./services/mlService";
 import { storage, type AssessmentCreateInput } from "./storage";
 import { requireAuth, requireAdmin, requireVerified } from "./auth";
 import { logger } from "./logger";
@@ -15,12 +16,23 @@ import {
   adminLimiter,
 } from "./middleware/rateLimit";
 import { rateLimit } from "express-rate-limit";
-import { MLService } from "./services/mlService";
+import { MLService, generateRequestFingerprint, calculateClinicalFallback } from "./services/mlService";
 import { getAssessmentQueue, getPythonExecutable } from "./queue";
 import { execFile } from "child_process";
+import { api } from "@shared/routes";
+import { assessmentsToCsv } from "./utils/csvExport";
+import { searchQuerySchema } from "./validation/searchValidation";
+import { analyzeSearchInput, logSecurityEvent, sanitizeDatabaseError } from "./security/sqlProtection";
+import { canAccessPatientRecord } from "./services/authz/patient-access";
+import { logAccessAttempt } from "./security/access-audit";
 import path from "path";
 import { fileURLToPath } from "url";
 import bcrypt from "bcrypt";
+import { validateDTO } from "./middleware/validateDTO";
+import { z } from "zod";
+import os from "os";
+import { randomUUID } from "crypto";
+import { writeFile, unlink } from "fs/promises";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -28,7 +40,7 @@ const analyzePyPath = path.resolve(__dirname, "..", "analyze.py");
 
 function execFileAsync(file: string, args: string[], options: any): Promise<{ stdout: string; stderr: string }> {
   return new Promise((resolve, reject) => {
-    execFile(file, args, options, (err, stdout, stderr) => {
+    safeExecFile(file, args, options, (err, stdout, stderr) => {
       if (err) reject(err);
       else resolve({ stdout: stdout as unknown as string, stderr: stderr as unknown as string });
     });
@@ -129,6 +141,96 @@ async function seedDatabase() {
   logger.info("Seeding complete!");
 }
 
+
+interface PredictionResult {
+  riskScore: number;
+  riskCategory: "LOW" | "MODERATE" | "HIGH";
+  factors: Array<{
+    name: string;
+    impact: "positive" | "negative";
+    description: string;
+  }>;
+  clinicianAdvice: string[];
+  patientAdvice: string[];
+}
+
+function calculateClinicalFallback(input: any): PredictionResult {
+  let points = 0;
+  const factors: Array<{ name: string; impact: "positive" | "negative"; description: string }> = [];
+
+  const age = Number(input.age) || 0;
+  if (age > 60) {
+    points += 20;
+    factors.push({ name: "Age > 60", impact: "positive", description: "Elderly demographic is associated with higher metabolic risk." });
+  } else if (age > 45) {
+    points += 10;
+    factors.push({ name: "Age > 45", impact: "positive", description: "Age over 45 increases baseline diabetes risk." });
+  }
+
+  const bmi = Number(input.bmi) || 0;
+  if (bmi >= 30) {
+    points += 25;
+    factors.push({ name: "Obese (BMI >= 30)", impact: "positive", description: "Elevated body mass index drives insulin resistance." });
+  } else if (bmi >= 25) {
+    points += 10;
+    factors.push({ name: "Overweight (BMI 25-30)", impact: "positive", description: "Slightly elevated BMI increases metabolic strain." });
+  } else if (bmi > 0 && bmi < 18.5) {
+    factors.push({ name: "Underweight (BMI < 18.5)", impact: "negative", description: "Lower body weight correlates with reduced metabolic risk." });
+  }
+
+  const hba1c = Number(input.hba1cLevel) || 0;
+  if (hba1c >= 6.5) {
+    points += 35;
+    factors.push({ name: "Diabetic HbA1c Range", impact: "positive", description: "HbA1c level >= 6.5% falls within the diabetic range." });
+  } else if (hba1c >= 5.7) {
+    points += 20;
+    factors.push({ name: "Prediabetic HbA1c", impact: "positive", description: "HbA1c level (5.7-6.4%) suggests impaired fasting glucose." });
+  }
+
+  const glucose = Number(input.bloodGlucoseLevel) || 0;
+  if (glucose >= 126) {
+    points += 20;
+    factors.push({ name: "Hyperglycemia", impact: "positive", description: "Fasting glucose >= 126 mg/dL indicates metabolic distress." });
+  } else if (glucose >= 100) {
+    points += 10;
+    factors.push({ name: "Elevated Fasting Glucose", impact: "positive", description: "Glucose (100-125 mg/dL) shows early glucose intolerance." });
+  }
+
+  if (input.hypertension) {
+    points += 10;
+    factors.push({ name: "Hypertension", impact: "positive", description: "High blood pressure is a known diabetes comorbidity." });
+  }
+
+  if (input.heartDisease) {
+    points += 10;
+    factors.push({ name: "Heart Disease", impact: "positive", description: "Prior cardiac history links with metabolic syndrome." });
+  }
+
+  const riskScore = Math.max(1.0, Math.min(99.0, points));
+  let riskCategory: "LOW" | "MODERATE" | "HIGH" = "LOW";
+  if (riskScore >= 50) {
+    riskCategory = "HIGH";
+  } else if (riskScore >= 20) {
+    riskCategory = "MODERATE";
+  }
+
+  return {
+    riskScore,
+    riskCategory,
+    factors: factors.length > 0 ? factors : [{ name: "Stable Profile", impact: "negative", description: "No major clinical risk drivers detected." }],
+    clinicianAdvice: riskCategory === "HIGH"
+      ? ["High risk. Refer for diagnostic oral glucose tolerance testing (OGTT)."]
+      : riskCategory === "MODERATE"
+      ? ["Moderate risk. Suggest nutritional counseling and review in 6 months."]
+      : ["Low risk. Encourage standard yearly wellness checks."],
+    patientAdvice: riskCategory === "HIGH"
+      ? ["Please schedule an appointment with your clinician to check diagnostic lab ranges."]
+      : riskCategory === "MODERATE"
+      ? ["Making positive dietary changes and staying active helps lower type 2 diabetes risk."]
+      : ["Continue maintaining a healthy, balanced lifestyle and regular physical activity."]
+  };
+}
+
 export async function registerRoutes(
   httpServer: Server,
   app: Express
@@ -167,10 +269,14 @@ export async function registerRoutes(
 
   // Mount domain-specific routers
   app.use("/api/auth", authRouter);
-  app.use("/api/assessments", assessmentsRouter);
+  // exportsRouter must be mounted BEFORE assessmentsRouter so that
+  // /api/assessments/export.csv is handled by the exports route and not
+  // caught by assessmentsRouter's /:id wildcard.
   app.use("/api/assessments", mlRouter);
   app.use("/api/assessments", exportsRouter);
+  app.use("/api/assessments", mlRouter);
   app.use("/api/assessments", analyticsRouter);
+  app.use("/api/assessments", assessmentsRouter);
   app.post(
     api.assessments.preview.path,
     requireAuth,

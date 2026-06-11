@@ -81,6 +81,13 @@ export type AssessmentCreateInput = InsertAssessment & {
 
 export class DatabaseStorage implements IStorage {
 
+  private assessmentRepository = new AssessmentRepository();
+  private userRepository = new UserRepository();
+  private auditRepository = new AuditRepository();
+  private analyticsRepository = new AnalyticsRepository();
+  private modelVersionRepository = new ModelVersionRepository();
+  private patientUserRepository = new PatientUserRepository();
+
 
   async updateUser(id: string, data: Partial<Pick<User, "isActive" | "role">>) {
     return this.userRepository.updateUser(id, data);

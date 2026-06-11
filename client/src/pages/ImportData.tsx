@@ -1,11 +1,13 @@
 import { useState, useRef } from "react";
 import Papa from "papaparse";
 import { ApiClient } from "@/lib/apiClient";
+import { useBulkImport } from "@/hooks/use-bulk-import";
 import { UploadCloud, CheckCircle, AlertCircle, Loader2, FileText, Download, X, XCircle, ShieldCheck } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
 import { AppLayout } from "@/components/layout/AppLayout";
+import { useBulkImport } from "@/hooks/use-bulk-import";
 
 const ACCEPTED_TYPES = ".csv,.xlsx,.xls";
 
