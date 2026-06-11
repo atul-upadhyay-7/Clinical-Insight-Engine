@@ -7,6 +7,7 @@ import type { Express } from "express";
 import type { Server } from "http";
 
 import assessmentsRouter from "./routes/assessments.routes";
+import { MLService, generateRequestFingerprint, calculateClinicalFallback, getPythonExecutable } from "./services/mlService";
 import { storage, type AssessmentCreateInput } from "./storage";
 import { requireAuth, requireAdmin, requireVerified } from "./auth";
 import { logger } from "./logger";
@@ -15,9 +16,9 @@ import {
   adminLimiter,
 } from "./middleware/rateLimit";
 import { rateLimit } from "express-rate-limit";
-import { MLService, generateRequestFingerprint } from "./services/mlService";
+import { MLService, generateRequestFingerprint, calculateClinicalFallback } from "./services/mlService";
 import { getAssessmentQueue, getPythonExecutable } from "./queue";
-import { safeExecFile } from "./utils/exec";
+import { execFile } from "child_process";
 import { api } from "@shared/routes";
 import { assessmentsToCsv } from "./utils/csvExport";
 import { searchQuerySchema } from "./validation/searchValidation";
@@ -268,10 +269,14 @@ export async function registerRoutes(
 
   // Mount domain-specific routers
   app.use("/api/auth", authRouter);
-  app.use("/api/assessments", assessmentsRouter);
+  // exportsRouter must be mounted BEFORE assessmentsRouter so that
+  // /api/assessments/export.csv is handled by the exports route and not
+  // caught by assessmentsRouter's /:id wildcard.
   app.use("/api/assessments", mlRouter);
   app.use("/api/assessments", exportsRouter);
+  app.use("/api/assessments", mlRouter);
   app.use("/api/assessments", analyticsRouter);
+  app.use("/api/assessments", assessmentsRouter);
   app.post(
     api.assessments.preview.path,
     requireAuth,
