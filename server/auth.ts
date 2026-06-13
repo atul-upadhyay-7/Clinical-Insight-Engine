@@ -10,7 +10,7 @@ import { users, emailVerificationTokens, passwordResetTokens } from "@shared/sch
 import { sendVerificationEmail, sendPasswordResetEmail } from "./email";
 import { logger } from "./logger";
 import { validateDTO } from "./middleware/validateDTO";
-import { registerDTOSchema, loginDTOSchema, forgotPasswordDTOSchema, resetPasswordDTOSchema, verifyEmailDTOSchema } from "./validation/auth.dto";
+import { registerDTOSchema, loginDTOSchema, forgotPasswordDTOSchema, resetPasswordDTOSchema, verifyEmailDTOSchema, verifyOtpDTOSchema } from "./validation/auth.dto";
 
 function hashPassword(password: string): string {
   return bcrypt.hashSync(password, 10);
@@ -42,7 +42,6 @@ interface RegisteredUser {
   passwordHash: string;
   licenseNumber: string;
 }
-
 
 
 /**
@@ -111,10 +110,6 @@ function normalizeEmail(email: string): string {
   return email.trim().toLowerCase();
 }
 
-export function getOtpRateLimitKey(req: { body: { email?: string }; ip: string }): string {
-  const email = req.body?.email;
-  return email ? `otp:${normalizeEmail(email)}` : `otp:ip:${req.ip}`;
-}
 
 // NOTE: there must be exactly one getOtpRateLimitKey export in this module.
 
@@ -126,6 +121,7 @@ function logDevOtp(email: string, otp: string) {
     logger.info(`[DEV] OTP for ${email}: ${otp}`);
   }
 }
+
 
 function regenerateSession(req: Request): Promise<void> {
 
@@ -402,6 +398,7 @@ export function createAuthRouter(): Router {
    */
   router.post("/resend-otp", resendLimiter, async (req: Request, res: Response) => {
     const email = (req.body?.email ?? "").trim().toLowerCase();
+    const mode = req.body?.mode;
 
     if (!email) {
       return res.status(400).json({ message: "Email is required." });
@@ -411,9 +408,7 @@ export function createAuthRouter(): Router {
     const expiresAt = new Date(Date.now() + 10 * 60 * 1000);
 
     try {
-      // In this codebase, resend-otp supports both flows but the client sends only email.
-      // Default to "login"-style behavior when there is pending OTP in memory.
-      if (true) {
+      if (mode === "login") {
 
         const pending = pendingOtps.get(email);
 
@@ -486,8 +481,7 @@ export function createAuthRouter(): Router {
    * POST /api/auth/verify-otp
    * Verifies the OTP sent after login/register and establishes a session.
    */
-  router.post("/verify-otp", authLimiter, validateDTO(loginDTOSchema), async (req: Request, res: Response) => {
-
+  router.post("/verify-otp", verifyEmailLimiter, validateDTO(verifyOtpDTOSchema), async (req: Request, res: Response) => {
     const { email, otp } = req.body;
 
     const pending = pendingOtps.get(email);
